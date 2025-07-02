@@ -36,10 +36,22 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
   const [language, setLanguage] = useState('python');
   const [remoteUsers, setRemoteUsers] = useState<{ [userId: string]: { name: string; cursor: any } }>({});
   
+  // Monitoring state (candidates only)
+  const [focusWarning, setFocusWarning] = useState<string | null>(null);
+  const [monitoringAlerts, setMonitoringAlerts] = useState<Array<{
+    type: string;
+    message: string;
+    timestamp: string;
+  }>>([]);
+  
   // WebSocket connection
   const wsRef = useRef<CollaborativeWebSocket | null>(null);
   const lastUpdateRef = useRef<string>('');
   const isLocalUpdateRef = useRef(false);
+  
+  // Monitoring refs (candidates only)
+  const focusLostTimeRef = useRef<number | null>(null);
+  const keystrokeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get language extension for CodeMirror
   const getLanguageExtension = (lang: string) => {
@@ -104,6 +116,17 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
         navigate('/');
         break;
         
+      case 'candidate_monitoring_alert':
+        // Only show alerts to interviewers
+        if (isInterviewer) {
+          setMonitoringAlerts(prev => [...prev, {
+            type: data.alert_type,
+            message: data.message,
+            timestamp: data.timestamp
+          }]);
+        }
+        break;
+        
       default:
         console.log('Unknown message type:', data.type);
     }
@@ -161,6 +184,91 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
       }
     };
   }, [user, profile, roomCode, handleWebSocketMessage]);
+
+  // Monitoring utility functions (candidates only) - must be declared before useEffect
+  const isSuspiciousKeyCombination = useCallback((key: string, ctrlKey: boolean, metaKey: boolean, altKey: boolean): boolean => {
+    const keyCombo = `${ctrlKey ? 'Ctrl+' : ''}${metaKey ? 'Cmd+' : ''}${altKey ? 'Alt+' : ''}${key}`;
+    
+    // Define suspicious key combinations
+    const suspiciousKeys = [
+      'Ctrl+C', 'Cmd+C', // Copy
+      'Ctrl+V', 'Cmd+V', // Paste
+      'Ctrl+A', 'Cmd+A', // Select All
+      'Ctrl+X', 'Cmd+X', // Cut
+      'Ctrl+Z', 'Cmd+Z', // Undo
+      'Ctrl+Y', 'Cmd+Y', // Redo
+      'Ctrl+F', 'Cmd+F', // Find
+      'Ctrl+H', 'Cmd+H', // Replace
+      'Ctrl+Tab', 'Cmd+Tab', // Switch tabs
+      'Alt+Tab', // Switch applications
+      'Ctrl+Shift+I', 'Cmd+Shift+I', // Developer tools
+      'F12', // Developer tools
+      'Ctrl+Shift+J', 'Cmd+Shift+J', // Console
+      'Ctrl+U', 'Cmd+U', // View source
+    ];
+    
+    return suspiciousKeys.includes(keyCombo);
+  }, []);
+
+  const sendKeystroke = useCallback((key: string, ctrlKey: boolean, metaKey: boolean, altKey: boolean) => {
+    if (!isInterviewer && wsRef.current && wsRef.current.isConnected()) {
+      const keyCombo = `${ctrlKey ? 'Ctrl+' : ''}${metaKey ? 'Cmd+' : ''}${altKey ? 'Alt+' : ''}${key}`;
+      const isSuspicious = isSuspiciousKeyCombination(key, ctrlKey, metaKey, altKey);
+      
+      wsRef.current.sendKeystrokeMonitoring(key, keyCombo, isSuspicious);
+    }
+  }, [isInterviewer, isSuspiciousKeyCombination]);
+
+  // Monitoring for candidates only
+  useEffect(() => {
+    if (isInterviewer || !user || !profile) return;
+
+    // Window focus/blur monitoring
+    const handleWindowBlur = () => {
+      focusLostTimeRef.current = Date.now();
+      setFocusWarning('⚠️ Warning: You have lost focus of the interview window. Please return to the interview.');
+    };
+
+    const handleWindowFocus = () => {
+      if (focusLostTimeRef.current) {
+        const duration = Date.now() - focusLostTimeRef.current;
+        if (duration > 1000 && wsRef.current && wsRef.current.isConnected()) { // Only report if lost focus for more than 1 second
+          wsRef.current.sendWindowFocusLost(Math.round(duration / 1000));
+        }
+        focusLostTimeRef.current = null;
+      }
+      setFocusWarning(null);
+    };
+
+    // Keystroke monitoring
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Clear previous timeout
+      if (keystrokeTimeoutRef.current) {
+        clearTimeout(keystrokeTimeoutRef.current);
+      }
+
+      // Debounce keystroke reporting to avoid spam
+      keystrokeTimeoutRef.current = setTimeout(() => {
+        sendKeystroke(event.key, event.ctrlKey, event.metaKey, event.altKey);
+      }, 100);
+    };
+
+    // Add event listeners
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('keydown', handleKeyDown);
+      
+      if (keystrokeTimeoutRef.current) {
+        clearTimeout(keystrokeTimeoutRef.current);
+      }
+    };
+  }, [isInterviewer, user, profile, sendKeystroke]);
 
   // Handle code changes
   const handleCodeChange = useCallback((value: string) => {
@@ -239,14 +347,44 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
             </span>
           </div>
 
-          {/* Close room button (interviewer only) */}
+          {/* Interviewer controls */}
           {isInterviewer && (
-            <button
-              onClick={handleCloseRoom}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
-            >
-              Close Room
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  // Open monitoring dashboard in a new window/modal
+                  // For now, we'll just show an alert with monitoring data
+                  roomAPI.getMonitoringData(roomCode)
+                    .then(data => {
+                      const alertMessage = `
+Monitoring Summary for Room ${roomCode}:
+• Total Focus Loss Incidents: ${data.monitoring_incidents.length}
+• Total Keystrokes Monitored: ${data.total_keystrokes}
+• Suspicious Key Combinations: ${data.keystroke_logs.filter(k => k.is_suspicious).length}
+
+Recent Incidents:
+${data.monitoring_incidents.slice(-3).map(i => 
+  `• ${i.type} - ${new Date(i.timestamp).toLocaleTimeString()}${i.duration ? ` (${i.duration}s)` : ''}`
+).join('\n')}
+                      `;
+                      alert(alertMessage);
+                    })
+                    .catch(error => {
+                      console.error('Failed to fetch monitoring data:', error);
+                      alert('Failed to fetch monitoring data');
+                    });
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors text-sm"
+              >
+                📊 Monitoring
+              </button>
+              <button
+                onClick={handleCloseRoom}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                Close Room
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -255,6 +393,34 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
       {connectionError && (
         <div className="bg-red-600 text-white p-3 rounded mb-4">
           <p>{connectionError}</p>
+        </div>
+      )}
+
+      {/* Focus warning for candidates */}
+      {!isInterviewer && focusWarning && (
+        <div className="bg-yellow-600 text-white p-3 rounded mb-4 animate-pulse">
+          <p className="font-semibold">{focusWarning}</p>
+        </div>
+      )}
+
+      {/* Monitoring alerts for interviewers */}
+      {isInterviewer && monitoringAlerts.length > 0 && (
+        <div className="bg-orange-600 text-white p-4 rounded mb-4">
+          <h3 className="font-semibold mb-2">🚨 Candidate Monitoring Alerts</h3>
+          <div className="space-y-2 max-h-32 overflow-y-auto">
+            {monitoringAlerts.slice(-5).reverse().map((alert, index) => (
+              <div key={index} className="text-sm bg-orange-700 p-2 rounded">
+                <p>{alert.message}</p>
+                <p className="text-orange-200 text-xs">{new Date(alert.timestamp).toLocaleTimeString()}</p>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setMonitoringAlerts([])}
+            className="mt-2 text-xs text-orange-200 hover:text-white underline"
+          >
+            Clear alerts
+          </button>
         </div>
       )}
 

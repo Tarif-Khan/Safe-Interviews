@@ -80,6 +80,34 @@ export const roomAPI = {
     });
     return handleResponse(response);
   },
+
+  // Get monitoring data for a room (interviewer only)
+  getMonitoringData: async (roomCode: string): Promise<{
+    room_code: string;
+    monitoring_incidents: Array<{
+      type: string;
+      user_id: string;
+      user_name: string;
+      timestamp: string;
+      duration?: number;
+    }>;
+    keystroke_logs: Array<{
+      user_id: string;
+      user_name: string;
+      timestamp: string;
+      key: string;
+      key_combination: string;
+      is_suspicious: boolean;
+    }>;
+    total_incidents: number;
+    total_keystrokes: number;
+  }> => {
+    const headers = await createAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/room/${roomCode}/monitoring`, {
+      headers,
+    });
+    return handleResponse(response);
+  },
 };
 
 // WebSocket connection for real-time collaboration
@@ -163,6 +191,31 @@ export class CollaborativeWebSocket {
         user_id: this.userId,
         user_name: this.userName,
         cursor_position: cursorPosition,
+      }));
+    }
+  }
+
+  // Monitoring methods for candidates
+  sendWindowFocusLost(duration: number): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'window_focus_lost',
+        user_id: this.userId,
+        user_name: this.userName,
+        duration: duration
+      }));
+    }
+  }
+
+  sendKeystrokeMonitoring(key: string, keyCombination: string, isSuspicious: boolean): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'keystroke_monitoring',
+        user_id: this.userId,
+        user_name: this.userName,
+        key: key,
+        key_combination: keyCombination,
+        is_suspicious: isSuspicious
       }));
     }
   }

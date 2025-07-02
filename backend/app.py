@@ -66,7 +66,9 @@ async def create_room(request: CreateRoomRequest, interviewer: AuthenticatedUser
         "created_at": datetime.utcnow(),
         "status": "waiting_for_candidate",
         "editor_content": "// Welcome to Safe Interviews!\n// Start coding together...\n",
-        "participants": []
+        "participants": [],
+        "monitoring_incidents": [],
+        "keystroke_logs": []
     }
     
     active_connections[room_code] = []
@@ -194,6 +196,56 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     "timestamp": datetime.utcnow().isoformat()
                 }, exclude_websocket=websocket)
                 
+            elif message["type"] == "window_focus_lost":
+                # Record window focus incident for candidates only
+                incident = {
+                    "type": "window_focus_lost",
+                    "user_id": message.get("user_id"),
+                    "user_name": message.get("user_name"),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "duration": message.get("duration", 0)
+                }
+                room["monitoring_incidents"].append(incident)
+                
+                # Notify interviewer about the incident
+                await broadcast_to_room(room_code, {
+                    "type": "candidate_monitoring_alert",
+                    "alert_type": "window_focus_lost",
+                    "user_id": message.get("user_id"),
+                    "user_name": message.get("user_name"),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "duration": message.get("duration", 0),
+                    "message": f"Candidate {message.get('user_name')} lost window focus"
+                }, exclude_websocket=websocket)
+                
+                logger.info(f"Window focus lost incident recorded for candidate {message.get('user_name')} in room {room_code}")
+                
+            elif message["type"] == "keystroke_monitoring":
+                # Record keystroke data for candidates only
+                keystroke_data = {
+                    "user_id": message.get("user_id"),
+                    "user_name": message.get("user_name"),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "key": message.get("key"),
+                    "key_combination": message.get("key_combination"),
+                    "is_suspicious": message.get("is_suspicious", False)
+                }
+                room["keystroke_logs"].append(keystroke_data)
+                
+                # If it's a suspicious key combination, alert the interviewer
+                if message.get("is_suspicious", False):
+                    await broadcast_to_room(room_code, {
+                        "type": "candidate_monitoring_alert",
+                        "alert_type": "suspicious_keystroke",
+                        "user_id": message.get("user_id"),
+                        "user_name": message.get("user_name"),
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "key_combination": message.get("key_combination"),
+                        "message": f"Candidate {message.get('user_name')} used suspicious key combination: {message.get('key_combination')}"
+                    }, exclude_websocket=websocket)
+                    
+                    logger.info(f"Suspicious keystroke recorded for candidate {message.get('user_name')} in room {room_code}: {message.get('key_combination')}")
+                
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected from room {room_code}")
     except Exception as e:
@@ -268,6 +320,28 @@ async def close_room(room_code: str):
     logger.info(f"Room {room_code} closed")
     
     return {"status": "success", "message": "Room closed successfully"}
+
+@app.get("/api/room/{room_code}/monitoring")
+async def get_monitoring_data(room_code: str, interviewer: AuthenticatedUser = Depends(require_interviewer_role)):
+    """Get monitoring data for a room (interviewer only)"""
+    room_code = room_code.upper()
+    
+    if room_code not in interview_rooms:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    room = interview_rooms[room_code]
+    
+    # Verify that the requester is the interviewer for this room
+    if room["interviewer"]["id"] != interviewer.user_id:
+        raise HTTPException(status_code=403, detail="Only the room's interviewer can access monitoring data")
+    
+    return {
+        "room_code": room_code,
+        "monitoring_incidents": room["monitoring_incidents"],
+        "keystroke_logs": room["keystroke_logs"],
+        "total_incidents": len(room["monitoring_incidents"]),
+        "total_keystrokes": len(room["keystroke_logs"])
+    }
 
 @app.get("/api/health")
 async def health_check():
