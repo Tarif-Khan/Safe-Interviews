@@ -33,21 +33,46 @@ function Home() {
         {/* Main content centered */}
         <div className="min-h-screen flex flex-col items-center justify-center p-4">
           <Title />
-          <div className="mt-8 text-center">
-            <p className="text-white text-lg mb-4">
-              Welcome back, {profile?.full_name || profile?.email || user.email}!
-            </p>
-            <p className="text-gray-300 text-md mb-8">
-              You are signed in as: <span className="font-semibold capitalize">{profile?.role || 'User'}</span>
-            </p>
+                  <div className="mt-8 text-center">
+          <p className="text-white text-lg mb-4">
+            Welcome back, {profile?.full_name || profile?.email || user.email}!
+          </p>
+          <p className="text-gray-300 text-md mb-8">
+            You are signed in as: <span className="font-semibold capitalize">{profile?.role || 'User'}</span>
+          </p>
+          
+          {/* Role-based interview options */}
+          <div className="space-y-4 mb-8">
+            {profile?.role === 'interviewer' && (
+              <Link
+                to="/create-room"
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 mr-4"
+              >
+                🎯 Create Interview Room
+              </Link>
+            )}
             
+            {profile?.role === 'candidate' && (
+              <Link
+                to="/join-room"
+                className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 mr-4"
+              >
+                🚀 Join Interview Room
+              </Link>
+            )}
+          </div>
+          
+          {/* Practice interview option */}
+          <div className="border-t border-gray-700 pt-6">
+            <p className="text-gray-400 text-sm mb-4">or practice on your own</p>
             <Link
               to="/interview"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
+              className="inline-block bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
             >
-              🚀 Start Interview
+              📝 Practice Interview
             </Link>
           </div>
+        </div>
         </div>
       </div>
     );

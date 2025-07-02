@@ -34,3 +34,13 @@ release
 *.exe
 *.msi
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+env/
+.venv/
+.env.local
