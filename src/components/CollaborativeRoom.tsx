@@ -52,6 +52,12 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
   // Monitoring refs (candidates only)
   const focusLostTimeRef = useRef<number | null>(null);
   const keystrokeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const activeModifiersRef = useRef<{
+    ctrl: boolean;
+    meta: boolean;
+    alt: boolean;
+    shift: boolean;
+  }>({ ctrl: false, meta: false, alt: false, shift: false });
 
   // Get language extension for CodeMirror
   const getLanguageExtension = (lang: string) => {
@@ -186,38 +192,56 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
   }, [user, profile, roomCode, handleWebSocketMessage]);
 
   // Monitoring utility functions (candidates only) - must be declared before useEffect
-  const isSuspiciousKeyCombination = useCallback((key: string, ctrlKey: boolean, metaKey: boolean, altKey: boolean): boolean => {
-    const keyCombo = `${ctrlKey ? 'Ctrl+' : ''}${metaKey ? 'Cmd+' : ''}${altKey ? 'Alt+' : ''}${key}`;
-    
+  const isSuspiciousKeyCombination = useCallback((keyCombo: string): boolean => {
     // Define suspicious key combinations
     const suspiciousKeys = [
-      'Ctrl+C', 'Cmd+C', // Copy
-      'Ctrl+V', 'Cmd+V', // Paste
-      'Ctrl+A', 'Cmd+A', // Select All
-      'Ctrl+X', 'Cmd+X', // Cut
-      'Ctrl+Z', 'Cmd+Z', // Undo
-      'Ctrl+Y', 'Cmd+Y', // Redo
-      'Ctrl+F', 'Cmd+F', // Find
-      'Ctrl+H', 'Cmd+H', // Replace
+      'Ctrl+c', 'Cmd+c', // Copy
+      'Ctrl+v', 'Cmd+v', // Paste
+      'Ctrl+a', 'Cmd+a', // Select All
+      'Ctrl+x', 'Cmd+x', // Cut
+      'Ctrl+z', 'Cmd+z', // Undo
+      'Ctrl+y', 'Cmd+y', // Redo
+      'Ctrl+f', 'Cmd+f', // Find
+      'Ctrl+h', 'Cmd+h', // Replace/History
+      'Ctrl+r', 'Cmd+r', // Refresh
+      'Ctrl+t', 'Cmd+t', // New tab
+      'Ctrl+w', 'Cmd+w', // Close tab
+      'Ctrl+n', 'Cmd+n', // New window
       'Ctrl+Tab', 'Cmd+Tab', // Switch tabs
       'Alt+Tab', // Switch applications
-      'Ctrl+Shift+I', 'Cmd+Shift+I', // Developer tools
+      'Ctrl+Shift+i', 'Cmd+Shift+i', // Developer tools
+      'Ctrl+Shift+j', 'Cmd+Shift+j', // Console
+      'Ctrl+u', 'Cmd+u', // View source
+      'Ctrl+p', 'Cmd+p', // Print
+      'Ctrl+s', 'Cmd+s', // Save
+      'Ctrl+o', 'Cmd+o', // Open
+      'Ctrl+b', 'Cmd+b', // Show/Hide
       'F12', // Developer tools
-      'Ctrl+Shift+J', 'Cmd+Shift+J', // Console
-      'Ctrl+U', 'Cmd+U', // View source
     ];
     
     return suspiciousKeys.includes(keyCombo);
   }, []);
 
-  const sendKeystroke = useCallback((key: string, ctrlKey: boolean, metaKey: boolean, altKey: boolean) => {
+  const buildKeyCombo = useCallback((key: string, modifiers: typeof activeModifiersRef.current): string => {
+    const parts: string[] = [];
+    
+    if (modifiers.ctrl) parts.push('Ctrl');
+    if (modifiers.meta) parts.push('Cmd');
+    if (modifiers.alt) parts.push('Alt');
+    if (modifiers.shift && key.length === 1) parts.push('Shift');
+    
+    // Normalize the key
+    const normalizedKey = key.length === 1 ? key.toLowerCase() : key;
+    parts.push(normalizedKey);
+    
+    return parts.join('+');
+  }, []);
+
+  const sendKeystroke = useCallback((key: string, keyCombo: string, isSuspicious: boolean) => {
     if (!isInterviewer && wsRef.current && wsRef.current.isConnected()) {
-      const keyCombo = `${ctrlKey ? 'Ctrl+' : ''}${metaKey ? 'Cmd+' : ''}${altKey ? 'Alt+' : ''}${key}`;
-      const isSuspicious = isSuspiciousKeyCombination(key, ctrlKey, metaKey, altKey);
-      
       wsRef.current.sendKeystrokeMonitoring(key, keyCombo, isSuspicious);
     }
-  }, [isInterviewer, isSuspiciousKeyCombination]);
+  }, [isInterviewer]);
 
   // Monitoring for candidates only
   useEffect(() => {
@@ -242,33 +266,63 @@ const CollaborativeRoom: React.FC<CollaborativeRoomProps> = ({ roomCode, isInter
 
     // Keystroke monitoring
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Clear previous timeout
+      const key = event.key;
+      
+      // Update modifier key states
+      activeModifiersRef.current = {
+        ctrl: event.ctrlKey,
+        meta: event.metaKey,
+        alt: event.altKey,
+        shift: event.shiftKey
+      };
+
+      // Check if this is a modifier key itself
+      if (['Control', 'Meta', 'Alt', 'Shift'].includes(key)) {
+        return; // Don't report modifier keys alone
+      }
+
+      // Build the key combination string
+      const keyCombo = buildKeyCombo(key, activeModifiersRef.current);
+      const isSuspicious = isSuspiciousKeyCombination(keyCombo);
+
+      // Report the keystroke (with debouncing to avoid spam)
       if (keystrokeTimeoutRef.current) {
         clearTimeout(keystrokeTimeoutRef.current);
       }
 
-      // Debounce keystroke reporting to avoid spam
       keystrokeTimeoutRef.current = setTimeout(() => {
-        sendKeystroke(event.key, event.ctrlKey, event.metaKey, event.altKey);
-      }, 100);
+        sendKeystroke(key, keyCombo, isSuspicious);
+      }, 50); // Reduced debounce time for better responsiveness
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Update modifier key states on release
+      activeModifiersRef.current = {
+        ctrl: event.ctrlKey,
+        meta: event.metaKey,
+        alt: event.altKey,
+        shift: event.shiftKey
+      };
     };
 
     // Add event listeners
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', handleWindowFocus);
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     // Cleanup
     return () => {
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
       
       if (keystrokeTimeoutRef.current) {
         clearTimeout(keystrokeTimeoutRef.current);
       }
     };
-  }, [isInterviewer, user, profile, sendKeystroke]);
+  }, [isInterviewer, user, profile, sendKeystroke, buildKeyCombo, isSuspiciousKeyCombination]);
 
   // Handle code changes
   const handleCodeChange = useCallback((value: string) => {
