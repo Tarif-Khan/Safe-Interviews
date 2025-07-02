@@ -33,3 +33,4 @@ release
 *.AppImage
 *.exe
 *.msi
+.env

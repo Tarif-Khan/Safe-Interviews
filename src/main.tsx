@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
+import { AuthProvider } from './contexts/AuthContext'
 
 // Add error handling for Electron
 window.addEventListener('error', (e) => {
@@ -24,7 +25,9 @@ if (!rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <HashRouter>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </HashRouter>
     </StrictMode>,
   );
