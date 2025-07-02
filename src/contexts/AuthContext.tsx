@@ -63,6 +63,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state change:', event, session?.user?.email)
+        
+        if (event === 'SIGNED_OUT') {
+          console.log('User signed out, clearing state')
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+        
         setUser(session?.user ?? null)
         
         if (session?.user) {
@@ -125,11 +134,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true)
     try {
       const result = await authHelpers.signOut()
-      setUser(null)
-      setProfile(null)
+      
+      // Don't manually set user/profile to null - let the auth state change listener handle it
+      // Only set loading to false on error, success will be handled by onAuthStateChange
+      if (result.error) {
+        setLoading(false)
+      }
+      
       return result
-    } finally {
+    } catch (error) {
       setLoading(false)
+      throw error
     }
   }
 

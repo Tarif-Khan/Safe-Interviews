@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import Title from "../Title";
 import { useAuth } from "../contexts/AuthContext";
 
 function Home() {
   const { user, profile, signOut, loading } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
 
   // If user is authenticated, show welcome message and sign out option
   if (user && (profile || !loading)) {
@@ -13,10 +14,19 @@ function Home() {
         {/* Top right sign out button for authenticated users */}
         <div className="absolute top-4 right-4">
           <button
-            onClick={signOut}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
+            onClick={async () => {
+              setSigningOut(true);
+              try {
+                await signOut();
+              } catch (error) {
+                console.error('Sign out error:', error);
+                setSigningOut(false);
+              }
+            }}
+            disabled={signingOut}
+            className="bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50"
           >
-            Sign Out
+            {signingOut ? 'Signing Out...' : 'Sign Out'}
           </button>
         </div>
 
