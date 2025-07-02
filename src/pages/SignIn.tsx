@@ -1,30 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import Title from "../Title";
 import { UserRole } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 
 function SignIn() {
-  const { user, profile, signIn } = useAuth();
+  const { user, profile, signIn, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const roleParam = searchParams.get('role');
   const role = roleParam === 'interviewer' ? UserRole.INTERVIEWER : UserRole.CANDIDATE;
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [error, setError] = useState('');
 
   const roleDisplayName = role === UserRole.INTERVIEWER ? 'Interviewer' : 'Candidate';
+  
+  // Only use AuthContext loading during sign-in process, not during initial app load
+  const loading = isSigningIn ? (authLoading || localLoading) : localLoading;
 
-  // If user is already authenticated, redirect to home
-  if (user && profile) {
+  // Reset signing-in state when authentication succeeds
+  useEffect(() => {
+    if (user && isSigningIn) {
+      console.log('User authenticated, resetting sign-in state', { user: user.email, profile });
+      setIsSigningIn(false);
+      setLocalLoading(false);
+    }
+  }, [user, profile, isSigningIn]);
+
+  // Add a timeout fallback for sign-in state
+  useEffect(() => {
+    if (isSigningIn) {
+      const timeout = setTimeout(() => {
+        console.log('Sign-in timeout reached, checking auth state', { user: user?.email, profile });
+        if (user) {
+          setIsSigningIn(false);
+          setLocalLoading(false);
+        }
+      }, 5000); // 5 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isSigningIn, user, profile]);
+
+  // If user is already authenticated, redirect to home (be more lenient about profile)
+  if (user && (profile || !authLoading)) {
     return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setLocalLoading(true);
+    setIsSigningIn(true);
     setError('');
 
     try {
@@ -32,13 +61,15 @@ function SignIn() {
       
       if (result.error) {
         setError(result.error.message);
-      } else {
-        // Success - will be automatically redirected by the Navigate above
+        setLocalLoading(false);
+        setIsSigningIn(false);
       }
+      // If successful, don't set local loading to false - let AuthContext handle it
+      // But we can reset isSigningIn since the auth state change will handle the rest
     } catch (err) {
       setError('An unexpected error occurred');
-    } finally {
-      setLoading(false);
+      setLocalLoading(false);
+      setIsSigningIn(false);
     }
   };
 

@@ -48,7 +48,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(session?.user ?? null)
       
       if (session?.user) {
-        await refreshProfile()
+        const { profile, error } = await authHelpers.getProfile(session.user.id)
+        if (!error && profile) {
+          setProfile(profile)
+        }
       }
       
       setLoading(false)
@@ -58,11 +61,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email)
         setUser(session?.user ?? null)
         
         if (session?.user) {
-          await refreshProfile()
+          const { profile, error } = await authHelpers.getProfile(session.user.id)
+          console.log('Profile fetch result:', { profile, error })
+          
+          if (!error && profile) {
+            setProfile(profile)
+          } else if (error) {
+            console.error('Error fetching profile:', error)
+            // If profile doesn't exist, we might need to create it or handle this case
+            setProfile(null)
+          }
         } else {
           setProfile(null)
         }
@@ -72,15 +85,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     )
 
     return () => subscription.unsubscribe()
-  }, [user])
+  }, [])
 
   const signUp = async (email: string, password: string, role: UserRole, fullName?: string) => {
     setLoading(true)
     try {
       const result = await authHelpers.signUp(email, password, role, fullName)
-      return result
-    } finally {
+      
+      // If sign-up was successful, keep loading true until auth state updates
+      // For sign-up, we actually want to set loading to false since users need to verify email
       setLoading(false)
+      
+      return result
+    } catch (error) {
+      setLoading(false)
+      throw error
     }
   }
 
@@ -88,9 +107,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true)
     try {
       const result = await authHelpers.signIn(email, password)
+      
+      // If sign-in was successful, keep loading true until auth state updates
+      // The loading will be set to false by the onAuthStateChange listener
+      if (result.error) {
+        setLoading(false)
+      }
+      
       return result
-    } finally {
+    } catch (error) {
       setLoading(false)
+      throw error
     }
   }
 

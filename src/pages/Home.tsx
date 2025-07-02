@@ -4,10 +4,10 @@ import Title from "../Title";
 import { useAuth } from "../contexts/AuthContext";
 
 function Home() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
 
   // If user is authenticated, show welcome message and sign out option
-  if (user && profile) {
+  if (user && (profile || !loading)) {
     return (
       <div className="min-h-screen w-screen bg-gray-900 relative">
         {/* Top right sign out button for authenticated users */}
@@ -25,10 +25,10 @@ function Home() {
           <Title />
           <div className="mt-8 text-center">
             <p className="text-white text-lg mb-4">
-              Welcome back, {profile.full_name || profile.email}!
+              Welcome back, {profile?.full_name || profile?.email || user.email}!
             </p>
             <p className="text-gray-300 text-md mb-8">
-              You are signed in as: <span className="font-semibold capitalize">{profile.role}</span>
+              You are signed in as: <span className="font-semibold capitalize">{profile?.role || 'User'}</span>
             </p>
             
             <Link
