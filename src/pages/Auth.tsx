@@ -33,66 +33,67 @@ function Auth() {
             Choose Your Authentication Method
           </h1>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {/* Sign In Section */}
-            <div className="bg-gray-800 rounded-lg p-6">
+            <div className="bg-gray-800 rounded-xl p-8 shadow-lg">
               <h2 className="text-white text-xl font-semibold mb-6 text-center">
                 Sign In
               </h2>
               <p className="text-gray-300 text-center mb-6">
                 Already have an account? Sign in to continue
               </p>
-              
-              <div className="space-y-4">
+              <div className="space-y-12">
                 <Link 
                   to="/signin?role=interviewer"
-                  className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 border-2 border-blue-600 hover:border-blue-500 text-center"
+                  className="block w-full backdrop-blur-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold py-4 px-6 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-300 text-center mb-8"
+                  style={{ WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}
                 >
                   <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold mb-1">Interviewer</span>
-                    <span className="text-sm opacity-90">Conduct interviews and evaluate candidates</span>
+                    <span className="text-lg font-bold mb-1 drop-shadow">Interviewer</span>
+                    <span className="text-sm opacity-90 drop-shadow">Conduct interviews and evaluate candidates</span>
                   </div>
                 </Link>
-                
                 <Link 
                   to="/signin?role=candidate"
-                  className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 border-2 border-green-600 hover:border-green-500 text-center"
+                  className="block w-full backdrop-blur-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold py-4 px-6 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-green-300 text-center"
+                  style={{ WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}
                 >
                   <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold mb-1">Candidate</span>
-                    <span className="text-sm opacity-90">Practice and take interview sessions</span>
+                    <span className="text-lg font-bold mb-1 drop-shadow">Candidate</span>
+                    <span className="text-sm opacity-90 drop-shadow">Practice and take interview sessions</span>
                   </div>
                 </Link>
               </div>
             </div>
             
             {/* Sign Up Section */}
-            <div className="bg-gray-800 rounded-lg p-6">
+            <div className="bg-gray-800 rounded-xl p-8 shadow-lg">
               <h2 className="text-white text-xl font-semibold mb-6 text-center">
                 Sign Up
               </h2>
               <p className="text-gray-300 text-center mb-6">
                 New to Safe Interviews? Create your account
               </p>
-              
-              <div className="space-y-4">
+              <div className="space-y-12">
                 <Link 
                   to="/signup?role=interviewer"
-                  className="block w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 border-2 border-purple-600 hover:border-purple-500 text-center"
+                  className="block w-full backdrop-blur-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold py-4 px-6 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-300 text-center mb-8"
+                  style={{ WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}
                 >
                   <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold mb-1">Interviewer</span>
-                    <span className="text-sm opacity-90">Create account to conduct interviews</span>
+                    <span className="text-lg font-bold mb-1 drop-shadow">Interviewer</span>
+                    <span className="text-sm opacity-90 drop-shadow">Create account to conduct interviews</span>
                   </div>
                 </Link>
                 
                 <Link 
                   to="/signup?role=candidate"
-                  className="block w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 border-2 border-orange-600 hover:border-orange-500 text-center"
+                  className="block w-full backdrop-blur-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold py-4 px-6 rounded-full transition-all duration-200 shadow-xl hover:shadow-2xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-orange-300 text-center"
+                  style={{ WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}
                 >
                   <div className="flex flex-col items-center">
-                    <span className="text-lg font-bold mb-1">Candidate</span>
-                    <span className="text-sm opacity-90">Create account to practice interviews</span>
+                    <span className="text-lg font-bold mb-1 drop-shadow">Candidate</span>
+                    <span className="text-sm opacity-90 drop-shadow">Create account to practice interviews</span>
                   </div>
                 </Link>
               </div>
