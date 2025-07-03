@@ -42,59 +42,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        const { profile, error } = await authHelpers.getProfile(session.user.id)
-        if (!error && profile) {
-          setProfile(profile)
-        }
-      }
-      
-      setLoading(false)
-    }
+    // Force sign out and clear session on app load, then set up auth state change handler
+    const forceSignOutAndInit = async () => {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
 
-    getInitialSession()
+      // Now set up auth state change handler
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          try {
+            console.log('Auth state change:', event, session?.user?.email);
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email)
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('User signed out, clearing state')
-          setUser(null)
-          setProfile(null)
-          setLoading(false)
-          return
-        }
-        
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          const { profile, error } = await authHelpers.getProfile(session.user.id)
-          console.log('Profile fetch result:', { profile, error })
-          
-          if (!error && profile) {
-            setProfile(profile)
-          } else if (error) {
-            console.error('Error fetching profile:', error)
-            // If profile doesn't exist, we might need to create it or handle this case
-            setProfile(null)
+            if (event === 'SIGNED_OUT') {
+              console.log('User signed out, clearing state');
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+              return;
+            }
+
+            setUser(session?.user ?? null);
+
+            if (session?.user) {
+              console.log('Fetching profile for user id:', session.user.id, 'and email:', session.user.email);
+              await new Promise(res => setTimeout(res, 500));
+              try {
+                const { data: rawProfile, error: rawError } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('email', session.user.email)
+                  .single();
+                console.log('Raw Supabase profile query result:', { rawProfile, rawError });
+                if (rawProfile) setProfile(rawProfile);
+                else setProfile(null);
+              } catch (e) {
+                console.error('Exception during raw profile fetch:', e);
+                setProfile(null);
+              }
+            } else {
+              setProfile(null);
+            }
+
+            setLoading(false);
+          } catch (e) {
+            console.error('Exception in onAuthStateChange handler:', e);
           }
-        } else {
-          setProfile(null)
         }
-        
-        setLoading(false)
-      }
-    )
+      );
 
-    return () => subscription.unsubscribe()
-  }, [])
+      // Clean up subscription on unmount
+      return () => subscription.unsubscribe();
+    };
+
+    forceSignOutAndInit();
+  }, []);
 
   const signUp = async (email: string, password: string, role: UserRole, fullName?: string) => {
     setLoading(true)

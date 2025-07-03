@@ -48,7 +48,7 @@ function CreateRoom() {
   // Redirect if not authenticated
   if (!user || !profile) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900">
         <div className="text-center">
           <p className="text-white text-xl mb-4">Please sign in to create a room</p>
           <Link
@@ -65,7 +65,7 @@ function CreateRoom() {
   // Show error if not an interviewer
   if (!isInterviewer) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900">
         <div className="text-center">
           <p className="text-white text-xl mb-4">Only interviewers can create rooms</p>
           <p className="text-gray-400 mb-6">Your current role: {profile.role}</p>
@@ -93,7 +93,7 @@ function CreateRoom() {
       </div>
 
       {/* Main content */}
-      <div className="max-w-2xl mx-auto text-center">
+      <div>
         <Title />
         
         <div className="mt-8">
