@@ -1,32 +1,36 @@
 import React, { useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Title from "../Title";
 import { UserRole } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import RoleSelector from "../components/RoleSelector";
 
 function SignUp() {
-  const { user, profile, signUp } = useAuth();
+  const { user, profile, signUp, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const roleParam = searchParams.get('role');
-  const role = roleParam === 'interviewer' ? UserRole.INTERVIEWER : UserRole.CANDIDATE;
   
+  const [role, setRole] = useState<UserRole>(roleParam === 'interviewer' ? UserRole.INTERVIEWER : UserRole.CANDIDATE);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const roleDisplayName = role === UserRole.INTERVIEWER ? 'Interviewer' : 'Candidate';
+  const loading = authLoading || localLoading;
 
   // If user is already authenticated, redirect to home
   if (user && profile) {
-    return <Navigate to="/" replace />;
+    // Using a Navigate component is better for redirects
+    // For now, let's keep it simple and just show a message or redirect early.
+    // This is handled by the router now, so this check is a fallback.
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setLocalLoading(true);
     setError('');
     setSuccess(false);
 
@@ -45,7 +49,7 @@ function SignUp() {
     } catch (err) {
       setError('An unexpected error occurred');
     } finally {
-      setLoading(false);
+      setLocalLoading(false);
     }
   };
 
@@ -115,15 +119,15 @@ function SignUp() {
         <div className="mt-8 w-full max-w-md">
           <div className="bg-gray-800 rounded-lg p-8">
             <h1 className="text-white text-2xl font-bold text-center mb-2">
-              Sign Up as {roleDisplayName}
+              Create Your Account
             </h1>
             <p className="text-gray-300 text-center mb-8">
-              {role === UserRole.INTERVIEWER 
-                ? "Create an account to conduct interviews" 
-                : "Create an account to practice interviews"}
+              Join Safe Interviews as a {roleDisplayName}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <RoleSelector role={role} setRole={setRole} loading={loading} />
+
               <div>
                 <label htmlFor="fullName" className="block text-sm font-medium text-gray-300 mb-2">
                   Full Name
@@ -198,15 +202,6 @@ function SignUp() {
                   Sign in here
                 </Link>
               </p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <Link
-                to="/auth"
-                className="text-gray-400 hover:text-gray-300 text-sm transition-colors duration-200"
-              >
-                Choose a different role
-              </Link>
             </div>
           </div>
         </div>

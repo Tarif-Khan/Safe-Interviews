@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Title from "../Title";
 import { UserRole } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
+import RoleSelector from "../components/RoleSelector";
 
 function SignIn() {
   const { user, profile, signIn, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const roleParam = searchParams.get('role');
-  const role = roleParam === 'interviewer' ? UserRole.INTERVIEWER : UserRole.CANDIDATE;
-  
+
+  const [role, setRole] = useState<UserRole>(roleParam === 'interviewer' ? UserRole.INTERVIEWER : UserRole.CANDIDATE);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
@@ -17,38 +18,27 @@ function SignIn() {
   const [error, setError] = useState('');
 
   const roleDisplayName = role === UserRole.INTERVIEWER ? 'Interviewer' : 'Candidate';
-  
-  // Only use AuthContext loading during sign-in process, not during initial app load
   const loading = isSigningIn ? (authLoading || localLoading) : localLoading;
 
-  // Reset signing-in state when authentication succeeds
   useEffect(() => {
     if (user && isSigningIn) {
-      console.log('User authenticated, resetting sign-in state', { user: user.email, profile });
       setIsSigningIn(false);
       setLocalLoading(false);
     }
-  }, [user, profile, isSigningIn]);
+  }, [user, isSigningIn]);
 
-  // Add a timeout fallback for sign-in state
   useEffect(() => {
     if (isSigningIn) {
       const timeout = setTimeout(() => {
-        console.log('Sign-in timeout reached, checking auth state', { user: user?.email, profile });
         if (user) {
           setIsSigningIn(false);
           setLocalLoading(false);
         }
-      }, 5000); // 5 second timeout
+      }, 5000);
 
       return () => clearTimeout(timeout);
     }
-  }, [isSigningIn, user, profile]);
-
-  // If user is already authenticated, redirect to home (be more lenient about profile)
-  if (user && (profile || !authLoading)) {
-    return <Navigate to="/" replace />;
-  }
+  }, [isSigningIn, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +54,6 @@ function SignIn() {
         setLocalLoading(false);
         setIsSigningIn(false);
       }
-      // If successful, don't set local loading to false - let AuthContext handle it
-      // But we can reset isSigningIn since the auth state change will handle the rest
     } catch (err) {
       setError('An unexpected error occurred');
       setLocalLoading(false);
@@ -75,7 +63,6 @@ function SignIn() {
 
   return (
     <div className="min-h-screen w-screen bg-gray-900 flex flex-col">
-      {/* Header with back link */}
       <div className="p-4">
         <Link
           to="/auth"
@@ -85,22 +72,21 @@ function SignIn() {
         </Link>
       </div>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <Title />
         
         <div className="mt-8 w-full max-w-md">
           <div className="bg-gray-800 rounded-lg p-8">
             <h1 className="text-white text-2xl font-bold text-center mb-2">
-              Sign In as {roleDisplayName}
+              Sign In
             </h1>
             <p className="text-gray-300 text-center mb-8">
-              {role === UserRole.INTERVIEWER 
-                ? "Access your interviewer dashboard" 
-                : "Continue your interview practice"}
+              Welcome back! Sign in as a {roleDisplayName}.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <RoleSelector role={role} setRole={setRole} loading={loading} />
+              
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                   Email Address
@@ -161,15 +147,6 @@ function SignIn() {
                   Sign up here
                 </Link>
               </p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <Link
-                to="/auth"
-                className="text-gray-400 hover:text-gray-300 text-sm transition-colors duration-200"
-              >
-                Choose a different role
-              </Link>
             </div>
           </div>
         </div>
